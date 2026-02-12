@@ -81,42 +81,9 @@ export interface Prescription {
   futureTarget: number;
 }
 
-export interface GoalEngineType {
-  calculateGoalGap(
-    goal: FinancialGoal,
-    currentSipAllocated: number,
-    expectedReturn: number,
-  ): Prescription;
-}
-
-export interface MertonEngineType {
-  calculate(state: PortfolioState, mu: number, sigma: number): MertonOutput;
-  calculateGamma(answers: RiskAnswers): number;
-  getPersona(gamma: number): string;
-  runMonteCarlo(
-    currentWealth: number,
-    years: number,
-    mu: number,
-    sigma: number,
-    monthlyContribution: number,
-  ): MonteCarloPoint[];
-}
-
-export interface SentimentEngineType {
-  calculate(newsItems: NewsItem[]): number;
-}
-
 export interface MonteCarloPoint {
   month: number;
   median: number;
   p10: number;
   p90: number;
-}
-
-export interface FactorEngineType {
-  calculate(persona: string, portfolioAssets: PortfolioAsset[] | null): number;
-}
-
-export interface TaxEngineType {
-  calculate(monthlyGross: number): { netMonthly: number; taxMonthly: number };
 }

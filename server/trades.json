@@ -1,0 +1,15 @@
+[
+  {
+    "symbol": "RELIANCE",
+    "action": "BUY",
+    "quantity": 10,
+    "price": 2500
+  },
+  {
+    "symbol": "TATASTEEL.BSE",
+    "action": "BUY",
+    "quantity": 10,
+    "price": 150,
+    "timestamp": "2026-02-12T14:35:12.326Z"
+  }
+]
