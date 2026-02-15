@@ -28,9 +28,10 @@ function createMcpServer() {
         version: '1.0.0',
     });
 
-    // Tool 1: Market Data
+    // Tool 1: Market Data [Quant]
     mcp.tool(
         'get_market_data',
+        '[Quant] Fetch live stock market data for a given symbol. Returns recent daily prices as a Markdown table.',
         { symbol: z.string().describe('Stock symbol (e.g., RELIANCE.BSE)') },
         async ({ symbol }) => {
             try {
@@ -45,7 +46,7 @@ function createMcpServer() {
                 }));
                 const tableHeader = `| Date | Close Price |\n|---|---|\n`;
                 const tableRows = summary.map((s: any) => `| ${s.date} | ${parseFloat(s.close).toFixed(2)} |`).join('\n');
-                const markdownTable = `### Market Data for ${symbol}\n\n${tableHeader}${tableRows}`;
+                const markdownTable = `### 📊 Market Data for ${symbol}\n\n${tableHeader}${tableRows}`;
 
                 return {
                     content: [
@@ -61,28 +62,34 @@ function createMcpServer() {
         },
     );
 
-    // Tool 2: News
+    // Tool 2: News [Advisor]
     mcp.tool(
         'get_financial_news',
-        'get_financial_news',
-        { persona: z.string().describe('[Advisor] The user persona to fetch news for') },
+        '[Advisor] Fetch curated financial news filtered by user persona. Returns sentiment-tagged headlines.',
+        { persona: z.string().describe('The user persona to fetch news for (e.g., Balanced Guardian, Aggressive Growth)') },
         async ({ persona }) => {
             const news = getSimulatedNews(persona);
+            const sentimentEmoji = (s: string) => s === 'positive' ? '🟢' : s === 'negative' ? '🔴' : '⚪';
+            const formatted = news.map((n: any) =>
+                `- ${sentimentEmoji(n.sentiment)} **${n.headline}** — _${n.source}_ (Impact: ${n.impact})\n  ${n.summary}`
+            ).join('\n');
+            const markdown = `### 📰 Financial News for "${persona}" Profile\n\n${formatted}`;
             return {
-                content: [{ type: 'text', text: JSON.stringify(news, null, 2) }],
+                content: [{ type: 'text', text: markdown }],
             };
         },
     );
 
-    // Tool 3: Wealth Insights
+    // Tool 3: Wealth Insights [Advisor]
     mcp.tool(
         'get_wealth_insights',
+        '[Advisor] Generate AI-powered wealth management advice using Gemini. Provides narrative diagnosis and actionable steps.',
         {
-            persona: z.string().describe('[Advisor] User persona'),
-            monthlyIncome: z.string(),
-            totalSavings: z.string(),
-            monthlyBurn: z.string(),
-            healthScore: z.number(),
+            persona: z.string().describe('User persona (e.g., Balanced Guardian)'),
+            monthlyIncome: z.string().describe('Monthly income formatted as currency string'),
+            totalSavings: z.string().describe('Total savings formatted as currency string'),
+            monthlyBurn: z.string().describe('Monthly expenses formatted as currency string'),
+            healthScore: z.number().describe('Financial health score out of 100'),
         },
         async (args) => {
             const insight = await generateWealthInsights(args);
@@ -90,11 +97,12 @@ function createMcpServer() {
         },
     );
 
-    // Tool 4: Portfolio Strategy
+    // Tool 4: Portfolio Strategy [Quant]
     mcp.tool(
         'calculate_portfolio_strategy',
+        '[Quant] Run full portfolio optimization pipeline: Merton Optimal Allocation, Monte Carlo simulation, Goal Gap analysis, and Factor scoring. Returns formatted Markdown report with AI narrative.',
         {
-            state: z.string().describe('[Quant] JSON stringified PortfolioState'),
+            state: z.string().describe('JSON stringified PortfolioState object'),
             portfolioAssets: z
                 .string()
                 .optional()
@@ -186,39 +194,93 @@ function createMcpServer() {
                     mRes.mertonFraction * 40 + avgGoalSuccess * 0.4 + qualityScore * 0.2,
                 );
 
-                const result = {
-                    merton: mRes,
-                    transitionMap: mapData,
-                    prescriptions: goalResults,
-                    healthScore: finalHealthScore,
-                    marketMetrics: { mu, sigma, sentimentTilt },
-                };
+                // === Format as Markdown ===
+                const fmtCurrency = (v: number) => `₹${Math.round(v).toLocaleString('en-IN')}`;
 
-                return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+                const mertonTable = `### 🧮 Merton Optimal Allocation
+
+| Metric | Value |
+|---|---|
+| **Investor Persona** | ${mRes.persona} |
+| **Optimal Equity Allocation** | ${(mRes.mertonFraction * 100).toFixed(1)}% |
+| **Human Capital** | ${fmtCurrency(mRes.humanCapital)} |
+| **Safe Monthly Consumption** | ${fmtCurrency(mRes.safeMonthlyConsumption)} |
+| **Savings Requirement** | ${fmtCurrency(mRes.savingsRequirement)} |
+| **Net Monthly Income** | ${fmtCurrency(mRes.netMonthlyIncome)} |
+| **Tax Leakage** | ${fmtCurrency(mRes.taxLeakage)} |`;
+
+                const mcLastPoint = mc[mc.length - 1];
+                const monteCarloSummary = `### 📈 Monte Carlo Projection (${yearsLeft} years)
+
+| Scenario | Projected Wealth |
+|---|---|
+| **Optimistic (P90)** | ${fmtCurrency(mcLastPoint?.p90 || 0)} |
+| **Median** | ${fmtCurrency(mcLastPoint?.median || 0)} |
+| **Conservative (P10)** | ${fmtCurrency(mcLastPoint?.p10 || 0)} |`;
+
+                let goalTable = '';
+                if (goalResults.length > 0) {
+                    const goalHeader = `### 🎯 Goal Gap Analysis\n\n| Goal | Success Rate | Monthly Gap | Recommended SIP Increase |\n|---|---|---|---|`;
+                    const goalRows = goalResults.map((g, i) => {
+                        const goalLabel = parsedState.goals[i]?.label || `Goal ${i + 1}`;
+                        return `| ${goalLabel} | ${g.successRate}% | ${fmtCurrency(g.increaseMonthlyFuel)} | +${fmtCurrency(g.increaseMonthlyFuel)}/mo |`;
+                    }).join('\n');
+                    goalTable = `${goalHeader}\n${goalRows}`;
+                }
+
+                const healthEmoji = finalHealthScore >= 70 ? '🟢' : finalHealthScore >= 40 ? '🟡' : '🔴';
+                const healthLine = `### ${healthEmoji} Financial Health Score: **${finalHealthScore}/100**\n\n_Quality Score: ${qualityScore} | Sentiment Tilt: ${sentimentTilt >= 0 ? '+' : ''}${sentimentTilt.toFixed(2)}_`;
+
+                // Auto-generate narrative insight via Gemini
+                let narrativeSection = '';
+                try {
+                    const narrative = await generateWealthInsights({
+                        persona: mRes.persona,
+                        monthlyIncome: fmtCurrency(parsedState.salary),
+                        totalSavings: fmtCurrency(parsedState.savings),
+                        monthlyBurn: fmtCurrency(parsedState.monthlyExpenses),
+                        healthScore: finalHealthScore,
+                    });
+                    narrativeSection = `\n\n---\n\n### 💡 AI Advisor Insight\n\n${narrative}`;
+                } catch (e) {
+                    console.warn('Narrative generation skipped:', e);
+                }
+
+                const markdown = [mertonTable, monteCarloSummary, goalTable, healthLine, narrativeSection]
+                    .filter(Boolean)
+                    .join('\n\n');
+
+                return { content: [{ type: 'text', text: markdown }] };
             } catch (e: any) {
                 return {
                     content: [
-                        { type: 'text', text: JSON.stringify({ error: e.message }) },
+                        { type: 'text', text: `❌ **Strategy Calculation Error:** ${e.message}` },
                     ],
                 };
             }
         },
     );
 
-    // Tool 5: Document Processor
-    mcp.tool('scan_financial_documents', {}, async () => {
-        const result = await scanDocumentsForInsights();
-        return { content: [{ type: 'text', text: result }] };
-    });
+    // Tool 5: Document Processor [Advisor]
+    mcp.tool(
+        'scan_financial_documents',
+        '[Advisor] Scan uploaded PDF financial documents and extract consolidated net worth summary using Gemini AI.',
+        {},
+        async () => {
+            const result = await scanDocumentsForInsights();
+            return { content: [{ type: 'text', text: result }] };
+        },
+    );
 
-    // Tool 6: Paper Trading (Execute Trade)
+    // Tool 6: Paper Trading - Execute Trade [Shared]
     mcp.tool(
         'execute_trade',
+        '[Shared] Execute a paper trade (BUY or SELL). The trade is persisted and reflected live on the React dashboard.',
         {
-            symbol: z.string(),
-            action: z.enum(['BUY', 'SELL']),
-            quantity: z.number(),
-            price: z.number(),
+            symbol: z.string().describe('Stock symbol (e.g., TCS, RELIANCE)'),
+            action: z.enum(['BUY', 'SELL']).describe('Trade action'),
+            quantity: z.number().describe('Number of shares'),
+            price: z.number().describe('Price per share'),
         },
         async ({ symbol, action, quantity, price }) => {
             const trade = {
@@ -229,27 +291,54 @@ function createMcpServer() {
                 timestamp: new Date().toISOString(),
             };
             const result = await executeTrade(trade);
-            return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+            const emoji = action === 'BUY' ? '🟢' : '🔴';
+            const fmtPrice = `₹${price.toLocaleString('en-IN')}`;
+            const markdown = result.success
+                ? `${emoji} **Trade Executed Successfully**\n\n| Field | Value |\n|---|---|\n| **Action** | ${action} |\n| **Symbol** | ${symbol} |\n| **Quantity** | ${quantity} |\n| **Price** | ${fmtPrice} |\n| **Total Value** | ₹${(quantity * price).toLocaleString('en-IN')} |\n| **Timestamp** | ${trade.timestamp} |\n\n_This trade is now visible on the live dashboard._`
+                : `❌ **Trade Failed:** ${result.error}`;
+            return { content: [{ type: 'text', text: markdown }] };
         },
     );
 
-    // Tool 7: Paper Trading (Get Holdings)
-    mcp.tool('get_holdings', {}, async () => {
-        const holdings = await getHoldings();
-        return { content: [{ type: 'text', text: JSON.stringify(holdings) }] };
-    });
+    // Tool 7: Paper Trading - Get Holdings [Shared]
+    mcp.tool(
+        'get_holdings',
+        '[Shared] View current paper trading portfolio holdings as a formatted table.',
+        {},
+        async () => {
+            const holdings = await getHoldings() as any[];
+            if (holdings.length === 0) {
+                return { content: [{ type: 'text', text: '📭 **No open positions.** Use `execute_trade` to start building your portfolio.' }] };
+            }
+            const totalValue = holdings.reduce((sum: number, h: any) => sum + (h.quantity * h.avgPrice), 0);
+            const header = `### 💼 Current Holdings\n\n| Symbol | Quantity | Avg Price | Market Value |\n|---|---|---|---|`;
+            const rows = holdings.map((h: any) => {
+                const value = h.quantity * h.avgPrice;
+                return `| **${h.symbol}** | ${h.quantity} | ₹${h.avgPrice.toFixed(2)} | ₹${value.toLocaleString('en-IN')} |`;
+            }).join('\n');
+            const footer = `\n\n**Total Portfolio Value: ₹${totalValue.toLocaleString('en-IN')}**`;
+            return { content: [{ type: 'text', text: `${header}\n${rows}${footer}` }] };
+        },
+    );
 
-    // Tool 8: Real-Time Macro Analyst
-    mcp.tool('get_macro_metrics', {}, async () => {
-        const data = await getMacroData();
-        return { content: [{ type: 'text', text: JSON.stringify(data) }] };
-    });
+    // Tool 8: Real-Time Macro Analyst [Shared]
+    mcp.tool(
+        'get_macro_metrics',
+        '[Shared] Fetch real-time macroeconomic indicators (inflation, GDP, bond yields, unemployment).',
+        {},
+        async () => {
+            const data = await getMacroData();
+            const markdown = `### 🌍 Macroeconomic Indicators\n\n| Indicator | Value |\n|---|---|\n| **Inflation (CPI)** | ${data.inflation}% |\n| **GDP Growth** | ${data.gdpGrowth}% |\n| **10Y Bond Yield** | ${data.bondYield10Y}% |\n| **Unemployment** | ${data.unemployment}% |\n| **Last Updated** | ${data.lastUpdated} |`;
+            return { content: [{ type: 'text', text: markdown }] };
+        },
+    );
 
-    // Tool 9: Scenario Simulator (Hackathon Feature)
+    // Tool 9: Scenario Simulator [Quant]
     mcp.tool(
         'simulate_market_shock',
+        '[Quant] Stress-test the portfolio against historical crisis scenarios. Shows impact breakdown and risk assessment.',
         {
-            shockType: z.enum(['2008_CRASH', 'COVID_19', 'TECH_BUBBLE', 'INFLATION_SPIKE']).describe('[Quant] The historical scenario to simulate')
+            shockType: z.enum(['2008_CRASH', 'COVID_19', 'TECH_BUBBLE', 'INFLATION_SPIKE']).describe('The historical crisis scenario to simulate')
         },
         async ({ shockType }) => {
             const result = await simulateMarketShock(shockType);

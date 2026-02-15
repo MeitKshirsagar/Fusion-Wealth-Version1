@@ -77,8 +77,12 @@ export function PortfolioImporter({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDragEnter: () => { },
+    onDragOver: () => { },
+    onDragLeave: () => { },
     accept: { 'application/pdf': ['.pdf'], 'text/csv': ['.csv'] },
     maxFiles: 1,
+    multiple: false,
   });
 
   // --- SHARED SUCCESS LOGIC ---

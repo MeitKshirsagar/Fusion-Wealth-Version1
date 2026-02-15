@@ -105,11 +105,35 @@ const TradingTerminal = () => {
   const [action, setAction] = useState<'BUY' | 'SELL'>('BUY');
   const [holdings, setHoldings] = useState<any[]>([]);
   const [message, setMessage] = useState('');
+  const [agentToast, setAgentToast] = useState('');
+  const [flashActive, setFlashActive] = useState(false);
+  const prevHoldingsRef = useRef<string>('');
+  const isLocalTradeRef = useRef(false);
 
   const fetchHoldings = async () => {
     try {
       const res = await fetch('http://localhost:3001/trade/holdings');
       const data = await res.json();
+      const newFingerprint = JSON.stringify(data);
+
+      // Detect external (agent) trade: holdings changed but NOT from local UI action
+      if (prevHoldingsRef.current && newFingerprint !== prevHoldingsRef.current && !isLocalTradeRef.current) {
+        // Find new or changed holdings
+        const prevHoldings: any[] = JSON.parse(prevHoldingsRef.current || '[]');
+        const newSymbols = data.filter((h: any) => {
+          const prev = prevHoldings.find((p: any) => p.symbol === h.symbol);
+          return !prev || prev.quantity !== h.quantity;
+        });
+        if (newSymbols.length > 0) {
+          const desc = newSymbols.map((h: any) => h.symbol).join(', ');
+          setAgentToast(`🤖 Agent Trade Detected: ${desc}`);
+          setFlashActive(true);
+          setTimeout(() => setAgentToast(''), 5000);
+          setTimeout(() => setFlashActive(false), 1500);
+        }
+      }
+      isLocalTradeRef.current = false;
+      prevHoldingsRef.current = newFingerprint;
       setHoldings(data);
     } catch (e) {
       console.error(e);
@@ -118,12 +142,13 @@ const TradingTerminal = () => {
 
   useEffect(() => {
     fetchHoldings();
-    const interval = setInterval(fetchHoldings, 5000); // Auto-sync with Archestra
+    const interval = setInterval(fetchHoldings, 3000); // Fast sync for demo
     return () => clearInterval(interval);
   }, []);
 
   const executeTrade = async () => {
     try {
+      isLocalTradeRef.current = true; // Mark as local trade to suppress agent toast
       const res = await fetch('http://localhost:3001/trade/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -139,7 +164,15 @@ const TradingTerminal = () => {
   };
 
   return (
-    <Card className="border-purple-500/20 bg-purple-500/[0.02]">
+    <Card className={`border-purple-500/20 bg-purple-500/[0.02] transition-all duration-500 ${flashActive ? 'ring-2 ring-emerald-400/60 shadow-[0_0_30px_rgba(52,211,153,0.3)]' : ''}`}>
+      {/* Agent Trade Toast */}
+      {agentToast && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold flex items-center gap-2 animate-pulse">
+          <Radio className="w-3.5 h-3.5" />
+          {agentToast}
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-4">
         <h2 className="font-bold uppercase text-[10px] tracking-widest text-purple-400 flex items-center gap-2">
           <Activity className="w-4 h-4" /> Paper Trading Agent
