@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import {
   fetchMarketData,
-  getSimulatedNews,
+  fetchLiveNews,
   generateWealthInsights,
   scanDocumentsForInsights,
   executeTrade,
@@ -42,9 +42,9 @@ async function startServer() {
       }
     });
 
-    app.get('/news', (req, res) => {
+    app.get('/news', async (req, res) => {
       const persona = (req.query.persona as string) || 'General';
-      res.json(getSimulatedNews(persona));
+      res.json(await fetchLiveNews(persona));
     });
 
     app.post('/insights', async (req, res) => {
@@ -81,7 +81,7 @@ async function startServer() {
         // 1. Market & News
         const mu = 0.1;
         const sigma = 0.18;
-        const news = getSimulatedNews(
+        const news = await fetchLiveNews(
           parsedState.goals.length > 0 ? 'Balanced Guardian' : 'General',
         );
         const sentimentTilt = SentimentEngine.calculate(news);

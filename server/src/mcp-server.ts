@@ -7,7 +7,7 @@ import { z } from 'zod';
 import express from 'express';
 import {
     fetchMarketData,
-    getSimulatedNews,
+    fetchLiveNews,
     generateWealthInsights,
     getMacroData,
     executeTrade,
@@ -68,7 +68,7 @@ function createMcpServer() {
         '[Advisor] Fetch curated financial news filtered by user persona. Returns sentiment-tagged headlines.',
         { persona: z.string().describe('The user persona to fetch news for (e.g., Balanced Guardian, Aggressive Growth)') },
         async ({ persona }) => {
-            const news = getSimulatedNews(persona);
+            const news = await fetchLiveNews(persona);
             const sentimentEmoji = (s: string) => s === 'positive' ? '🟢' : s === 'negative' ? '🔴' : '⚪';
             const formatted = news.map((n: any) =>
                 `- ${sentimentEmoji(n.sentiment)} **${n.headline}** — _${n.source}_ (Impact: ${n.impact})\n  ${n.summary}`
@@ -125,7 +125,7 @@ function createMcpServer() {
                 }
 
                 // 2. Fetch News
-                const news = getSimulatedNews(
+                const news = await fetchLiveNews(
                     parsedState.goals.length > 0 ? 'Balanced Guardian' : 'General',
                 );
                 const sentimentTilt = SentimentEngine.calculate(news);

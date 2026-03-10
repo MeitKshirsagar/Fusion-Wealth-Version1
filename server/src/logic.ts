@@ -21,71 +21,112 @@ export async function fetchMarketData(symbol: string) {
     return response.data;
 }
 
-export function getSimulatedNews(persona: string) {
-    const newsDatabase: any = {
+export async function fetchLiveNews(persona: string) {
+    const apiKey = process.env.ALPHAVANTAGE_API_KEY;
+
+    // Map persona to relevant search topics for Alpha Vantage
+    const topicMap: Record<string, string> = {
+        'Balanced Guardian': 'financial_markets,economy_fiscal',
+        'Aggressive Growth': 'technology,ipo,earnings',
+        'Conservative Shield': 'finance,economy_monetary',
+        default: 'financial_markets,economy_fiscal',
+    };
+    const topics = topicMap[persona] || topicMap['default'];
+
+    // Try live Alpha Vantage News Sentiment API
+    if (apiKey) {
+        try {
+            const url = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&topics=${topics}&sort=LATEST&limit=6&apikey=${apiKey}`;
+            const response = await axios.get(url, { timeout: 8000 });
+            const feed = response.data?.feed;
+
+            if (feed && Array.isArray(feed) && feed.length > 0) {
+                console.log(`[News] Fetched ${feed.length} live articles from Alpha Vantage`);
+                return feed.slice(0, 5).map((article: any) => {
+                    // Map Alpha Vantage sentiment score to our labels
+                    const score = parseFloat(article.overall_sentiment_score || '0');
+                    const sentiment = score >= 0.15 ? 'positive' : score <= -0.15 ? 'negative' : 'neutral';
+
+                    // Map sentiment to impact level
+                    const absScore = Math.abs(score);
+                    const impact = absScore >= 0.25 ? 'High' : absScore >= 0.1 ? 'Medium' : 'Low';
+
+                    // Format timestamp as relative time
+                    const publishedDate = article.time_published
+                        ? formatRelativeTime(article.time_published)
+                        : 'Recently';
+
+                    // Extract category from topics
+                    const category = article.topics?.[0]?.topic
+                        ?.replace(/_/g, ' ')
+                        ?.replace(/\b\w/g, (c: string) => c.toUpperCase())
+                        || 'Markets';
+
+                    return {
+                        headline: article.title || 'Breaking News',
+                        source: article.source || 'Alpha Vantage',
+                        sentiment,
+                        impact,
+                        summary: article.summary || '',
+                        url: article.url || '#',
+                        timestamp: publishedDate,
+                        category,
+                    };
+                });
+            }
+        } catch (err: any) {
+            console.warn(`[News] Alpha Vantage API failed, using fallback:`, err.message);
+        }
+    }
+
+    // Fallback: return simulated news from the pool
+    return getSimulatedNewsFallback(persona);
+}
+
+function formatRelativeTime(avTimestamp: string): string {
+    try {
+        // Alpha Vantage format: "20250215T120000"
+        const year = avTimestamp.substring(0, 4);
+        const month = avTimestamp.substring(4, 6);
+        const day = avTimestamp.substring(6, 8);
+        const hour = avTimestamp.substring(9, 11);
+        const minute = avTimestamp.substring(11, 13);
+        const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:00Z`);
+        const diffMs = Date.now() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} mins ago`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } catch {
+        return 'Recently';
+    }
+}
+
+function getSimulatedNewsFallback(persona: string) {
+    const pickRandom = (arr: any[], count: number) => {
+        const shuffled = [...arr].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, Math.min(count, arr.length));
+    };
+    const dynamicTimestamp = () => {
+        const opts = ['Just now', '2 mins ago', '8 mins ago', '15 mins ago', '27 mins ago', '42 mins ago', '1 hour ago', '2 hours ago', '3 hours ago'];
+        return opts[Math.floor(Math.random() * opts.length)];
+    };
+    const pool: any = {
         default: [
-            {
-                headline: 'RBI Holds Rates',
-                source: 'Mint',
-                sentiment: 'neutral',
-                impact: 'High',
-                summary: 'Central bank maintains status quo.',
-                url: 'https://www.livemint.com/market',
-                timestamp: '2 hours ago',
-            },
-            {
-                headline: 'Nifty 50 Hits ATA',
-                source: 'Economic Times',
-                sentiment: 'positive',
-                impact: 'Medium',
-                summary: 'Market breadth remains positive.',
-                url: 'https://economictimes.indiatimes.com/',
-                timestamp: '4 hours ago',
-            },
-        ],
-        'Balanced Guardian': [
-            {
-                headline: 'Blue-chip Resilience',
-                source: 'Bloomberg',
-                sentiment: 'positive',
-                impact: 'Medium',
-                warning: 'None',
-                summary: 'Large-caps offer stability.',
-                url: 'https://www.bloomberg.com/asia',
-                timestamp: '1 hour ago',
-            },
-            {
-                headline: 'Bond Yields Steady',
-                source: 'Reuters',
-                sentiment: 'neutral',
-                impact: 'Low',
-                summary: 'Fixed income remains attractive.',
-                url: 'https://www.reuters.com/finance',
-                timestamp: '30 mins ago',
-            },
-        ],
-        'Aggressive Growth': [
-            {
-                headline: 'Small-Cap Rally',
-                source: 'MoneyControl',
-                sentiment: 'positive',
-                impact: 'High',
-                summary: 'Emerging sectors showing upside.',
-                url: 'https://www.moneycontrol.com/',
-                timestamp: '5 hours ago',
-            },
-            {
-                headline: 'Tech Volatility',
-                source: 'CNBC',
-                sentiment: 'negative',
-                impact: 'Medium',
-                summary: 'Correction in IT stocks.',
-                url: 'https://www.cnbctv18.com/',
-                timestamp: '1 day ago',
-            },
+            { headline: 'RBI Holds Key Repo Rate Steady at 6.5%', source: 'Mint', sentiment: 'neutral', impact: 'High', summary: 'Central bank maintains status quo citing balanced inflation outlook.', url: 'https://www.livemint.com/market', category: 'Monetary Policy' },
+            { headline: 'Nifty 50 Hits Fresh All-Time High', source: 'Economic Times', sentiment: 'positive', impact: 'High', summary: 'Broad-based rally led by banking and IT heavyweights.', url: 'https://economictimes.indiatimes.com/', category: 'Markets' },
+            { headline: 'India GDP Growth Accelerates to 7.2%', source: 'Reuters', sentiment: 'positive', impact: 'High', summary: 'Manufacturing and services PMI data confirms robust expansion.', url: 'https://www.reuters.com/finance', category: 'Economy' },
+            { headline: 'FII Outflows Hit ₹12,000 Cr in February', source: 'MoneyControl', sentiment: 'negative', impact: 'Medium', summary: 'Foreign institutional investors continue selling amid risk-off sentiment.', url: 'https://www.moneycontrol.com/', category: 'Capital Flows' },
+            { headline: 'Gold Rallies to Record ₹72,500 Per 10g', source: 'Bloomberg', sentiment: 'positive', impact: 'Medium', summary: 'Safe-haven demand drives gold to new highs.', url: 'https://www.bloomberg.com/asia', category: 'Commodities' },
+            { headline: 'US Fed Signals Two Rate Cuts in 2025', source: 'Reuters', sentiment: 'positive', impact: 'High', summary: 'Dovish pivot boosts global equity sentiment.', url: 'https://www.reuters.com/finance', category: 'Global Policy' },
         ],
     };
-    return newsDatabase[persona] || newsDatabase['default'];
+    const items = pool[persona] || pool['default'];
+    return pickRandom(items, 4).map((item: any) => ({ ...item, timestamp: dynamicTimestamp() }));
 }
 
 export async function generateWealthInsights(profile: any) {

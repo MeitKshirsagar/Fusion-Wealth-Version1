@@ -308,24 +308,7 @@ function FusionWealthAppContent() {
       monthlyExpenses: 0,
       contributionConsistency: 0,
     },
-    goals: [
-      {
-        id: '1',
-        label: 'Dream Home',
-        type: 'Housing',
-        targetAmount: 25000000,
-        yearsAway: 12,
-        inflationRate: 0.06,
-      },
-      {
-        id: '2',
-        label: "Kid's Education",
-        type: 'Education',
-        targetAmount: 12000000,
-        yearsAway: 15,
-        inflationRate: 0.1,
-      },
-    ],
+    goals: [],
   });
 
   const [marketMetrics, setMarketMetrics] = useState<{
@@ -1304,19 +1287,19 @@ function FusionWealthAppContent() {
             </div>
           </Card>
 
-          <Card className="lg:col-span-12">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="font-black text-xl italic uppercase flex items-center gap-3">
-                <Goal className="w-6 h-6 text-amber-400" /> Goal Success Roadmap
+          <Card className="lg:col-span-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="font-black text-lg italic uppercase flex items-center gap-3">
+                <Goal className="w-5 h-5 text-amber-400" /> Goal Success Roadmap
               </h2>
               <button
                 onClick={addGoal}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all hover:scale-105 active:scale-95"
+                className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase transition-all hover:scale-105 active:scale-95"
               >
-                <Plus className="w-3 h-3" /> Add New Goal
+                <Plus className="w-3 h-3" /> Add Goal
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-4">
               {state.goals.map((goal, idx) => {
                 const pres = prescriptions[idx];
                 const isEditing = editingGoalId === goal.id;
@@ -1422,6 +1405,10 @@ function FusionWealthAppContent() {
               })}
             </div>
           </Card>
+
+          <div className="lg:col-span-6">
+            <TradingTerminal />
+          </div>
 
           <Card className="lg:col-span-8 h-[450px]">
             <div className="flex justify-between items-center mb-6">
@@ -1661,7 +1648,7 @@ function FusionWealthAppContent() {
               </p>
             </Card>
 
-            <TradingTerminal />
+
 
             <Card className="flex-1 flex flex-col overflow-hidden max-h-[500px]">
               <div className="flex justify-between items-center mb-6">

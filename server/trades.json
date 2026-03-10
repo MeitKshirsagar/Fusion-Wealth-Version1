@@ -11,5 +11,17 @@
     "quantity": 10,
     "price": 150,
     "timestamp": "2026-02-12T14:35:12.326Z"
+  },
+  {
+    "symbol": "RELIANCE",
+    "quantity": 1,
+    "price": 2500,
+    "action": "BUY"
+  },
+  {
+    "symbol": "RELIANCE",
+    "quantity": 1,
+    "price": 25000,
+    "action": "BUY"
   }
 ]
