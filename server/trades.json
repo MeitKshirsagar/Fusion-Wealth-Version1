@@ -23,5 +23,11 @@
     "quantity": 1,
     "price": 25000,
     "action": "BUY"
+  },
+  {
+    "symbol": "RELIANCE",
+    "quantity": 1,
+    "price": 2500,
+    "action": "BUY"
   }
 ]
